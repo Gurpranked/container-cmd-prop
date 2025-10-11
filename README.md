@@ -7,7 +7,7 @@ Container command propagation tool for Podman
 [Podman SDK](https://podman-py.readthedocs.io/en/latest/)
 
 ## Features we want:
-- [ ] Parallel and equential command propagation
+- [ ] Parallel and sequential command propagation
 - [ ] Shell script support
 
 
