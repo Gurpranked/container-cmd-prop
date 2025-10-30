@@ -17,7 +17,7 @@ def exec_into_container(container: str, command: str):  # container may be an ob
                             stdout=subprocess.PIPE,
                             text=True
     ) # Ex: podman exec pod1
-    print('result of execution\n', result.stdout)
+    print('result of execution\n\n', result.stdout)
 
 
 # Parallel
