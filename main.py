@@ -4,20 +4,21 @@ from multiprocessing import (
 )
 import subprocess
 import os
+import json
 
+RUNC_CMD = "podman"  # set by default on machines
+if os.environ.get("RUNC_CMD"):
+    RUNC_CMD = os.environ.get("RUNC_CMD")
 
 # Use subprocess to enter command into the container
 def exec_into_container(container: str, command: str):  # container may be an object in the future
-    RUNC_CMD = "podman"  # set by default on machines
-    if os.environ.get("RUNC_CMD"):
-        RUNC_CMD = os.environ.get("RUNC_CMD")
 
     result = subprocess.run([RUNC_CMD, "exec", container, "/bin/sh", "-c", command],
                             stderr=subprocess.PIPE,
                             stdout=subprocess.PIPE,
                             text=True
     ) # Ex: podman exec pod1
-    print('\nresult of execution\n', result.stdout)
+    print(f'\nresult of execution for container {container}\n', result.stdout)
 
 
 # Parallel
@@ -28,6 +29,7 @@ def exec_into_container(container: str, command: str):  # container may be an ob
 def parallel_exec(containers: list[str], cmd: str | list[str]):     # container may be an object in the future
 
     num_workers = os.cpu_count() or 1
+    print('your thread count:', num_workers)
 
     tasks = [(container, cmd) for container in containers]
 
@@ -46,16 +48,30 @@ def parallel_exec(containers: list[str], cmd: str | list[str]):     # container 
 def main():
     # Adding basic flags
     parser = argparse.ArgumentParser(description="Command line tool to execute commands in Docker/Podman containers sequentially or parallely.")
-    parser.add_argument("-c", "--containers", required=True, help="The containers to pass the commands to.", nargs='+')    # + is 1+ args aka list
+    container_group = parser.add_mutually_exclusive_group(required=True)
+    container_group.add_argument("-c", "--containers", help="The containers to pass the commands to.", nargs='+')    # + is 1+ args aka list
+    container_group.add_argument("-A", "--all", action="store_true", help="Pass the commands to all the containers.")
     parser.add_argument("-m", "--cmd", required=True, help="The commands to pass to the containers")  
-    parser.add_argument("-A", "--all", action="store_true", help="Pass the commands to all the containers.")
-    group = parser.add_mutually_exclusive_group(required=True)
-    group.add_argument("-p", "--parallel", action="store_true", help="Run the command across the containers parallely.")
-    group.add_argument("-s", "--sequential", action="store_true", help="Run the command across the containers sequentially.")
+    execution_group = parser.add_mutually_exclusive_group(required=True)
+    execution_group.add_argument("-p", "--parallel", action="store_true", help="Run the command across the containers parallely.")
+    execution_group.add_argument("-s", "--sequential", action="store_true", help="Run the command across the containers sequentially.")
     args = parser.parse_args()
 
-    if args.containers and args.parallel and args.cmd:
-        parallel_exec(args.containers, args.cmd)
+    if args.parallel and args.cmd:
+        if args.all:
+            containers = []
+            result = subprocess.run([RUNC_CMD, "ps", "--format", "json"], 
+                                    stderr=subprocess.PIPE, 
+                                    stdout=subprocess.PIPE
+            ).stdout
+
+            for cont in json.loads(result):             # Converts json into dict
+                containers.append(cont['Names'][0])
+        
+            parallel_exec(containers, args.cmd)
+        
+        elif args.containers:
+            parallel_exec(args.containers, args.cmd)
 
 
 
