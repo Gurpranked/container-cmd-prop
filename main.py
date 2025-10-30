@@ -1,18 +1,23 @@
 import argparse
 from multiprocessing import (
-    Process
+    Pool
 )
 import subprocess
 import os
 
 
 # Use subprocess to enter command into the container
-def exec_into_container(container: str, command: str | list[str]):  # container may be an object in the future
+def exec_into_container(container: str, command: str):  # container may be an object in the future
     RUNC_CMD = "podman"  # set by default on machines
     if os.environ.get("RUNC_CMD"):
         RUNC_CMD = os.environ.get("RUNC_CMD")
 
-    result = subprocess.run([RUNC_CMD, "exec", "-d", container, command]) # Ex: podman exec pod1
+    result = subprocess.run([RUNC_CMD, "exec", container, "/bin/sh", "-c", command],
+                            stderr=subprocess.PIPE,
+                            stdout=subprocess.PIPE,
+                            text=True
+    ) # Ex: podman exec pod1
+    print('result of execution\n', result.stdout)
 
 
 # Parallel
@@ -22,54 +27,35 @@ def exec_into_container(container: str, command: str | list[str]):  # container 
 # Send the command to a unique container from each process
 def parallel_exec(containers: list[str], cmd: str | list[str]):     # container may be an object in the future
 
-    num_cont = len(containers)
-    num_proc_to_spawn = os.cpu_count()
-    index = 0
-    processes = []
+    num_workers = os.cpu_count() or 1
 
-    while (num_cont > 0 and index < num_cont):
+    tasks = [(container, cmd) for container in containers]
 
-        if (num_cont <= num_proc_to_spawn):
-            # Spawn num_cont processes
-            for i in range(num_cont + 1):
-                p = Process(target=exec_into_container, args=(containers[index], cmd))
-                processes.append(p)
-                p.start()
-                index += 1
-            num_cont -= num_cont
-        else:
-            # Spawn num_proc_to_spawn processes
-            for i in range(num_cont + 1):
-                p = Process(target=exec_into_container, args=(containers[index], cmd))
-                processes.append(p)
-                p.start()
-                index += 1
-
-            num_cont -= num_proc_to_spawn
-    
-    for proc in processes:
-        proc.join()
+    # This automatically runs at most num_worker processes and schedules remaining containers when a process finishes
+    with Pool(processes=num_workers) as pool:
+        pool.starmap(exec_into_container, tasks)
 
 
 
 # Sequential case
 # Parse given list of container
 # For loop to send command to each container
-def seq_exec(containers: list, cmd: str | list[str], )
+# def seq_exec(containers: list, cmd: str | list[str], )
     
 
 def main():
     # Adding basic flags
     parser = argparse.ArgumentParser(description="Command line tool to execute commands in Docker/Podman containers sequentially or parallely.")
-    parser.add_argument("-c", "--containers", action="store_true", required=True, help="The containers to pass the commands to.", nargs='+')    # + is 1+ args aka list
-    parser.add_argument("", "--cmd", required=True, action="store_true", help="The commands to pass to the containers", nargs='+')  
+    parser.add_argument("-c", "--containers", required=True, help="The containers to pass the commands to.", nargs='+')    # + is 1+ args aka list
+    parser.add_argument("-m", "--cmd", required=True, help="The commands to pass to the containers")  
     parser.add_argument("-A", "--all", action="store_true", help="Pass the commands to all the containers.")
-    parser.add_mutually_exclusive_group("-p", "--parallel", required=True, action="store_true", help="Run the command across the containers parallely.")
-    parser.add_mutually_exclusive_group("-s", "--sequential", required=True, action="store_true", help="Run the command across the containers sequentially.")
+    group = parser.add_mutually_exclusive_group(required=True)
+    group.add_argument("-p", "--parallel", action="store_true", help="Run the command across the containers parallely.")
+    group.add_argument("-s", "--sequential", action="store_true", help="Run the command across the containers sequentially.")
     args = parser.parse_args()
 
-    if args.c and args.p and args.cmd:
-        parallel_exec(args.c, args.cmd)
+    if args.containers and args.parallel and args.cmd:
+        parallel_exec(args.containers, args.cmd)
 
 
 
