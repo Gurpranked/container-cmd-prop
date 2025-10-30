@@ -12,7 +12,7 @@ def exec_into_container(container: str, command: str | list[str]):  # container 
     if os.environ.get("RUNC_CMD"):
         RUNC_CMD = os.environ.get("RUNC_CMD")
 
-    result = subprocess.run([RUNC_CMD, "exec", "-d", container, command]) # Ex: podman exec pod1 
+    result = subprocess.run([RUNC_CMD, "exec", "-d", container, command]) # Ex: podman exec pod1
 
 
 # Parallel
@@ -61,11 +61,17 @@ def seq_exec(containers: list, cmd: str | list[str], )
 def main():
     # Adding basic flags
     parser = argparse.ArgumentParser(description="Command line tool to execute commands in Docker/Podman containers sequentially or parallely.")
-    parser.add_argument("-c", "--containers", action="store_true", help="The containers to pass the commands to.")
-    parser.add_argument("", "--cmd", action="store_true", help="The commands to pass to the containers")
+    parser.add_argument("-c", "--containers", action="store_true", required=True, help="The containers to pass the commands to.", nargs='+')    # + is 1+ args aka list
+    parser.add_argument("", "--cmd", required=True, action="store_true", help="The commands to pass to the containers", nargs='+')  
     parser.add_argument("-A", "--all", action="store_true", help="Pass the commands to all the containers.")
-    parser.add_argument("-p", "--parallel", action="store_true", help="Run the command across the containers parallely.")
-    parser.add_argument("-s", "--sequential", action="store_true", help="Run the command across the containers sequentially.")
+    parser.add_mutually_exclusive_group("-p", "--parallel", required=True, action="store_true", help="Run the command across the containers parallely.")
+    parser.add_mutually_exclusive_group("-s", "--sequential", required=True, action="store_true", help="Run the command across the containers sequentially.")
+    args = parser.parse_args()
+
+    if args.c and args.p and args.cmd:
+        parallel_exec(args.c, args.cmd)
+
+
 
 if __name__ == "__main__":
     main()
