@@ -66,7 +66,8 @@ def main():
             ).stdout
 
             for cont in json.loads(result):             # Converts json into dict
-                containers.append(cont['Names'][0])
+                if cont['Names'][0]:
+                    containers.append(cont['Names'][0])
         
             parallel_exec(containers, args.cmd)
         
