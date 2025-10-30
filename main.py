@@ -1,12 +1,45 @@
 import argparse
+from multiprocessing import (
+    Process
+)
+import subprocess
+import os
+
+
+# Use subprocess to enter command into the container
+def exec_into_container(container: str, command: str | list[str]):  # container may be an object in the future
+    #
 
 
 # Parallel Case
 # Find a way to get the list of container
-# Spawn X number of threads 
-# Send the command to a unique container from each thread
-# Join threads and complete
-def parallel_exec(containers: list, cmd: str | list[str])
+# Spawn max X number of processes depending on # cores 
+# Continue until all work is complete
+# Send the command to a unique container from each process
+def parallel_exec(containers: list[str], cmd: str | list[str]):     # container may be an object in the future
+
+    num_cont = len(containers)
+    num_proc_to_spawn = os.cpu_count()
+    index = 0
+
+    while (num_cont > 0 and index < num_cont):
+
+        if (num_cont <= num_proc_to_spawn):
+            # Spawn num_cont processes
+            for i in range(num_cont + 1):
+                p = Process(target=exec_into_container, args=(containers[index], cmd))
+                p.start()
+                index += 1
+            num_cont -= num_cont
+        else:
+            # Spawn num_proc_to_spawn processes
+            for i in range(num_cont + 1):
+                p = Process(target=exec_into_container, args=(containers[index], cmd))
+                p.start()
+                index += 1
+
+            num_cont -= num_proc_to_spawn
+
 
 
 # Sequential case
