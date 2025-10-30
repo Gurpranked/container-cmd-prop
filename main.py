@@ -9,8 +9,8 @@ import os
 # Use subprocess to enter command into the container
 def exec_into_container(container: str, command: str | list[str]):  # container may be an object in the future
     RUNC_CMD = "podman"  # set by default on machines
-    if os.environ["RUNC_CMD"]:
-        RUNC_CMD = os.environ['RUNC_CMD']
+    if os.environ.get("RUNC_CMD"):
+        RUNC_CMD = os.environ.get("RUNC_CMD")
 
     result = subprocess.run([RUNC_CMD, "exec", "-d", container, command]) # Ex: podman exec pod1 
 
