@@ -1,7 +1,6 @@
 import argparse
-from multiprocessing import (
-    Pool
-)
+import multiprocessing
+from concurrent.futures import ThreadPoolExecutor
 import subprocess
 import os
 import json
@@ -20,6 +19,8 @@ def exec_into_container(container: str, command: str):  # container may be an ob
     ) # Ex: podman exec pod1
     # print(f'\nresult of execution for container {container}\n', result.stdout)
 
+    if result.returncode != 0:
+        print('ERR EXECUTING CMD')
 
 # Parallel
 # Find a way to get the list of container
@@ -28,15 +29,18 @@ def exec_into_container(container: str, command: str):  # container may be an ob
 # Send the command to a unique container from each process
 def parallel_exec(containers: list[str], cmd: str | list[str]):     # container may be an object in the future
 
-    num_workers = os.cpu_count() or 1
-    # print('your thread count:', num_workers)
+    # num_workers = os.cpu_count() or 1
+    # # print('your thread count:', num_workers)
 
-    tasks = [(container, cmd) for container in containers]
+    # tasks = [(container, cmd) for container in containers]
 
-    # This automatically runs at most num_worker processes and schedules remaining containers when a process finishes
-    with Pool(processes=num_workers) as pool:
-        pool.starmap(exec_into_container, tasks)
+    # # This automatically runs at most num_worker processes and schedules remaining containers when a process finishes
+    # with Pool(processes=num_workers) as pool:
+    #     pool.starmap(exec_into_container, tasks)
 
+    max_workers = min(len(containers), multiprocessing.cpu_count())
+    with ThreadPoolExecutor(max_workers=max_workers) as executor:
+        executor.map(lambda c: exec_into_container(c, cmd), containers)
 
 
 # Sequential case

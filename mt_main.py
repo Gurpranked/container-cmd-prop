@@ -12,7 +12,7 @@ if os.environ.get("RUNC_CMD"):
 # Use subprocess to enter command into the container
 def exec_into_container(container: str, command: str):  # container may be an object in the future
 
-    result = subprocess.run([RUNC_CMD, "exec", container, "/bin/sh", "-c", command],
+    subprocess.run([RUNC_CMD, "exec", container, "/bin/sh", "-c", command],
                             stderr=subprocess.PIPE,
                             stdout=subprocess.PIPE,
                             text=True
@@ -30,6 +30,28 @@ def parallel_exec(containers: list[str], cmd):
 
     with ThreadPoolExecutor(max_workers=max_workers) as executor:
         executor.map(lambda c: exec_into_container(c, cmd), containers)
+
+# Function without ThreadPoolExecutor
+def parallel_exec_wo_tpe(containers: list[str], cmd):
+    processes = []
+
+    for container in containers:
+        full_cmd = f"{RUNC_CMD} exec {container} {cmd}"
+        proc = subprocess.Popen(
+            full_cmd,
+            shell=True,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+        )
+
+        processes.append((container, proc))
+
+    # Wait for all processes to finish
+    for container, proc in processes:
+        stdout, stderr = proc.communicate()
+        if proc.returncode != 0:
+            print(f"[ERROR] Container {container}: {stderr.decode().strip()}")
+
 
 
 
