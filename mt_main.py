@@ -1,7 +1,6 @@
 import argparse
-from multiprocessing import (
-    Pool
-)
+import multiprocessing
+from concurrent.futures import ThreadPoolExecutor
 import subprocess
 import os
 import json
@@ -26,16 +25,12 @@ def exec_into_container(container: str, command: str):  # container may be an ob
 # Spawn max X number of processes depending on # cores 
 # Continue until all work is complete
 # Send the command to a unique container from each process
-def parallel_exec(containers: list[str], cmd: str | list[str]):     # container may be an object in the future
+def parallel_exec(containers: list[str], cmd):
+    max_workers = multiprocessing.cpu_count()   # number of CPU threads available
 
-    num_workers = os.cpu_count() or 1
-    # print('your thread count:', num_workers)
+    with ThreadPoolExecutor(max_workers=max_workers) as executor:
+        executor.map(lambda c: exec_into_container(c, cmd), containers)
 
-    tasks = [(container, cmd) for container in containers]
-
-    # This automatically runs at most num_worker processes and schedules remaining containers when a process finishes
-    with Pool(processes=num_workers) as pool:
-        pool.starmap(exec_into_container, tasks)
 
 
 
