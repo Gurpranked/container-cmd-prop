@@ -4,20 +4,39 @@ from concurrent.futures import ThreadPoolExecutor
 import subprocess
 import os
 import json
+import docker
+import requests_unixsocket
 
 RUNC_CMD = "podman"  # set by default on machines
 if os.environ.get("RUNC_CMD"):
     RUNC_CMD = os.environ.get("RUNC_CMD")
 
+session = requests_unixsocket.Session()
+
 # Use subprocess to enter command into the container
 def exec_into_container(container: str, command: str):  # container may be an object in the future
 
-    subprocess.run([RUNC_CMD, "exec", container, "/bin/sh", "-c", command],
-                            stderr=subprocess.PIPE,
-                            stdout=subprocess.PIPE,
-                            text=True
-    ) # Ex: podman exec pod1
-    # print(f'\nresult of execution for container {container}\n', result.stdout)
+    if RUNC_CMD == "podman":
+        # Create exec instance
+        sock = f"/run/user/{os.getuid()}/podman/podman.sock".replace("/", "%2F")
+        create_url = f"http+unix://{sock}/v4.7.0/libpod/containers/{container}/exec"
+
+        create_res = session.post(
+            create_url,
+            json={"cmd": ["/bin/sh", "-c", command], "tty": False, "stdin": False, "cwd": "/"},
+        )   
+        
+        create_res.raise_for_status()
+        exec_id = create_res.json()['Id']
+
+        # start
+        start_url = f"http+unix://{sock}/v4.7.0/libpod/exec/{exec_id}/start"
+        start_res = session.post(start_url, json={"Detach": False, "Tty": False})
+        start_res.raise_for_status()
+
+        print(start_res.text)
+
+        
 
 
 # Parallel
@@ -25,9 +44,9 @@ def exec_into_container(container: str, command: str):  # container may be an ob
 # Spawn max X number of processes depending on # cores 
 # Continue until all work is complete
 # Send the command to a unique container from each process
-def parallel_exec(containers: list[str], cmd):
-    max_workers = multiprocessing.cpu_count()   # number of CPU threads available
+def parallel_exec(containers: list[str], cmd: str | list[str]):     # container may be an object in the future
 
+    max_workers = min(len(containers), multiprocessing.cpu_count())
     with ThreadPoolExecutor(max_workers=max_workers) as executor:
         executor.map(lambda c: exec_into_container(c, cmd), containers)
 
