@@ -42,6 +42,31 @@ def exec_into_container(container: str, command: str):  # container may be an ob
         if(start_res.text != ""):
             print(start_res.text)
 
+    elif RUNC_CMD == "docker":
+        sock = f"/var/run/docker.sock".replace("/", "%2F")
+        create_url = f"http+unix://{sock}/containers/{container}/exec"
+
+        create_res = session.post(
+            create_url,
+            json={
+                "Cmd": ["/bin/sh", "-c", command],
+                "AttachStdout": True,
+                "AttachStderr": True,
+                "AttachStdin": False,
+                "Tty": False
+            }
+        )
+
+        create_res.raise_for_status()
+        exec = create_res.json()['Id']
+
+        start_url = f"http+unix://{sock}/exec/{exec}/start"
+        start_res = session.post(start_url, json={"Detach": False})
+        start_res.raise_for_status()
+
+        if start_res.text != "":
+            print(start_res.text)
+
         
 
 
@@ -107,9 +132,17 @@ def main():
                                     stdout=subprocess.PIPE
             ).stdout
 
-            for cont in json.loads(result):             # Converts json into dict
-                if cont['Names'][0]:
-                    containers.append(cont['Names'][0])
+            if (RUNC_CMD == "podman"):
+                for cont in json.loads(result):             # Converts json into dict
+                    if cont['Names'][0]:
+                        containers.append(cont['Names'][0])
+            elif RUNC_CMD == "docker":
+                lines = result.splitlines()
+                
+                for line in lines:
+                    containers.append(json.loads(line)['Names'])
+            else:
+                return
         
             parallel_exec(containers, args.cmd)
         
