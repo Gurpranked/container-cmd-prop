@@ -16,8 +16,8 @@ Container command propagation tool for Podman
 - Sequential
 
 Options:
-`-A`: All containers
-`--cmd`: Command to run or file URI
-`--containers`: Arg List or CSV file of all containers
-`-p`: Run in parallel across containers
-`-s`: Run sequntially across containers (random order)
+- `-A`: All containers
+- `--cmd`: Command to run or file URI
+- `--containers`: Arg List or CSV file of all containers
+- `-p`: Run in parallel across containers
+- `-s`: Run sequentially across containers (random order)
