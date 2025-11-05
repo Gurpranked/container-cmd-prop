@@ -5,6 +5,12 @@ import subprocess
 import os
 import json
 
+
+# Verbose print, produces output only if verbose mode is toggled
+# Configured in main
+# Global to enable access in other files
+verboseprint = lambda a*, **k: None
+
 RUNC_CMD = "podman"  # set by default on machines
 if os.environ.get("RUNC_CMD"):
     RUNC_CMD = os.environ.get("RUNC_CMD")
@@ -42,12 +48,11 @@ def parallel_exec(containers: list[str], cmd: str | list[str]):     # container 
     with ThreadPoolExecutor(max_workers=max_workers) as executor:
         executor.map(lambda c: exec_into_container(c, cmd), containers)
 
-
 # Sequential case
 # Parse given list of container
 # For loop to send command to each container
 # def seq_exec(containers: list, cmd: str | list[str], )
-    
+
 
 def main():
     # Adding basic flags
@@ -57,9 +62,13 @@ def main():
     container_group.add_argument("-A", "--all", action="store_true", help="Pass the commands to all the containers.")
     parser.add_argument("-m", "--cmd", required=True, help="The commands to pass to the containers")  
     execution_group = parser.add_mutually_exclusive_group(required=True)
-    execution_group.add_argument("-p", "--parallel", action="store_true", help="Run the command across the containers parallely.")
-    execution_group.add_argument("-s", "--sequential", action="store_true", help="Run the command across the containers sequentially.")
+    execution_group.add_argument("-p", "--parallel", action="store_true", help="Deploy the command(s) across the containers in parallel.")
+    execution_group.add_argument("-s", "--sequential", action="store_true", help="Deploy the command(s) across the containers in sequence.")
+    parser.add_arugment("-v", "--verbose", action="store_true", help="Verbose Mode")
     args = parser.parse_args()
+    
+    # Function to toggle verbose output in functions 
+    verboseprint = print if args.verbose else lambda *a, **k: None
 
     if args.parallel and args.cmd:
         if args.all:
@@ -82,3 +91,4 @@ def main():
 
 if __name__ == "__main__":
     main()
+
