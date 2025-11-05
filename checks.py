@@ -1,3 +1,6 @@
+# Copyright 2025
+# Author: Gurpreet Singh
+
 import shutil
 import os
 from main import verboseprint

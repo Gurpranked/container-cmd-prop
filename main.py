@@ -1,15 +1,17 @@
 import argparse
 import multiprocessing
-from concurrent.futures import ThreadPoolExecutor
 import subprocess
 import os
 import json
+from concurrent.futures import ThreadPoolExecutor
+from podman import PodmanClient
 
 
 # Verbose print, produces output only if verbose mode is toggled
 # Configured in main
 # Global to enable access in other files
 verboseprint = lambda *a, **k: None
+
 
 RUNC_CMD = "podman"  # set by default on machines
 if os.environ.get("RUNC_CMD"):
@@ -30,6 +32,32 @@ def exec_into_container(container: str, command: str):  # container may be an ob
 
 # Parallel
 # Find a way to get the list of container
+# Spawn X number of threads 
+# Send the command to a unique container from each thread
+# Join threads and complete
+
+# Sequential case
+# Parse given list of container
+# For loop to send command to each container
+
+# URI path for libpod service. Unix Domain Socket (UDS). TCP not implemented by PodmanClient Package
+uri = "unix:///run/user/1000/podman/podman.sock"
+
+with PodmanClient(base_uri=uri) as client:
+    version = client.version()
+    print("Release: ", version["Version"])
+    print("Compatible API: ", version["ApiVersion"])
+    print("Podman API: ", version["Components"][0]["Details"]["ApiVersion"], "\n")
+    # Gets containers and prints info
+    for container in client.containers.list():
+        # Get list of containers with refreshed metadata 
+        container.reload()
+        print(container, container.id, "\n")
+        print(container, container.status, "\n")
+        
+        # available fields
+        print(sorted(container.attrs.keys()))
+
 # Spawn max X number of processes depending on # cores 
 # Continue until all work is complete
 # Send the command to a unique container from each process
@@ -48,10 +76,12 @@ def parallel_exec(containers: list[str], cmd: str | list[str]):     # container 
     with ThreadPoolExecutor(max_workers=max_workers) as executor:
         executor.map(lambda c: exec_into_container(c, cmd), containers)
 
+
 # Sequential case
 # Parse given list of container
 # For loop to send command to each container
 # def seq_exec(containers: list, cmd: str | list[str], )
+    
 
 
 def main():
@@ -68,7 +98,7 @@ def main():
     args = parser.parse_args()
     
     # Function to toggle verbose output in functions 
-    verboseprint = print if args.verbose else lambda *a, **k: None
+    global verboseprint = print if args.verbose else lambda *a, **k: None
 
     if args.parallel and args.cmd:
         if args.all:
@@ -91,4 +121,3 @@ def main():
 
 if __name__ == "__main__":
     main()
-
