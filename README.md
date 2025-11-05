@@ -20,4 +20,4 @@ Options:
 - `--cmd`: Command to run or file URI
 - `--containers`: Arg List or CSV file of all containers
 - `-p`: Run in parallel across containers
-- `-s`: Run sequntially across containers (random order)
+- `-s`: Run sequentially across containers (random order)
