@@ -3,9 +3,10 @@
 
 import shutil
 import os
-from main import verboseprint
 
-def find_podman_socket():
+verboseprint = print if os.environ['CCP_VERBOSE']=='TRUE' else lambda *a, **k: None
+
+bbb find_podman_socket():
     """
     Attempt to locate a valid Podman service socket.
     Checks rootless and root Podman socket paths.
