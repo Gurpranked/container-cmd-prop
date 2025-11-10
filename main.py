@@ -1,9 +1,13 @@
+
+
 import argparse
 import multiprocessing
 from concurrent.futures import ThreadPoolExecutor
 import subprocess
 import os
 import json
+import podman
+import docker
 
 
 verboseprint = print if os.environ['CCP_VERBOSE']=='TRUE' else lambda *a, **k: None
@@ -12,63 +16,29 @@ RUNC_CMD = "podman"  # set by default on machines
 if os.environ.get("RUNC_CMD"):
     RUNC_CMD = os.environ.get("RUNC_CMD")
 
+PODMAN_CLIENT = podman.from_env()
+DOCKER_CLIENT = docker.from_env()
+
 
 # Use subprocess to enter command into the container
 def exec_into_container(container: str, command: str):  # container may be an object in the future
-    import requests_unixsocket
-    session = requests_unixsocket.Session()     # creates a socket session for each container/thread
 
     if RUNC_CMD == "podman":
-        # Create exec instance
-        sock = f"/run/user/{os.getuid()}/podman/podman.sock".replace("/", "%2F")
-        create_url = f"http+unix://{sock}/v4.7.0/libpod/containers/{container}/exec"
+        PODMAN_CLIENT.containers.get(container).exec_run(cmd=["/bin/sh", "-c", command], stderr=True, stdout=True, stdin=False, tty=False)
 
-        create_res = session.post(
-            create_url,
-            json={
-                "Cmd": ["/bin/sh", "-c", command],
-                "AttachStdout": True,
-                "AttachStderr": True,
-                "AttachStdin": False,
-                "Tty": False
-            }
-        )   
-        
-        create_res.raise_for_status()
-        exec_id = create_res.json()['Id']
-
-        # start the exec instance
-        start_url = f"http+unix://{sock}/v4.7.0/libpod/exec/{exec_id}/start"
-        start_res = session.post(start_url, json={"Detach": False})
-        start_res.raise_for_status()
-
-        if(start_res.text != ""):
-            print(start_res.text)
+        # create_res = session.post(
+        #     create_url,
+        #     json={
+        #         "Cmd": ["/bin/sh", "-c", command],
+        #         "AttachStdout": True,
+        #         "AttachStderr": True,
+        #         "AttachStdin": False,
+        #         "Tty": False
+        #     }
+        # )         
 
     elif RUNC_CMD == "docker":
-        sock = f"/var/run/docker.sock".replace("/", "%2F")
-        create_url = f"http+unix://{sock}/containers/{container}/exec"
-
-        create_res = session.post(
-            create_url,
-            json={
-                "Cmd": ["/bin/sh", "-c", command],
-                "AttachStdout": True,
-                "AttachStderr": True,
-                "AttachStdin": False,
-                "Tty": False
-            }
-        )
-
-        create_res.raise_for_status()
-        exec = create_res.json()['Id']
-
-        start_url = f"http+unix://{sock}/exec/{exec}/start"
-        start_res = session.post(start_url, json={"Detach": False})
-        start_res.raise_for_status()
-
-        if start_res.text != "":
-            print(start_res.text)
+        DOCKER_CLIENT.containers.get(container_id=container).exec_run(cmd=["/bin/sh", "-c", command], stderr=True, stdout=True, stdin=False, tty=False)
 
         
 
@@ -85,7 +55,7 @@ def parallel_exec(containers: list[str], cmd: str | list[str]):     # container 
         list(executor.map(lambda c: exec_into_container(c, cmd), containers))
 
 # Function without ThreadPoolExecutor
-def parallel_exec_wo_tpe(containers: list[str], cmd):
+def parallel_exec_wo_tpe(containers, cmd):
     processes = []
 
     for container in containers:
@@ -134,20 +104,13 @@ def main():
     if args.parallel and args.cmd:
         if args.all:
             containers = []
-            result = subprocess.run([RUNC_CMD, "ps", "--format", "json"], 
-                                    stderr=subprocess.PIPE, 
-                                    stdout=subprocess.PIPE
-            ).stdout
-
+            
             if (RUNC_CMD == "podman"):
-                for cont in json.loads(result):             # Converts json into dict
-                    if cont['Names'][0]:
-                        containers.append(cont['Names'][0])
+                # List containers
+                containers = [image.id for image in PODMAN_CLIENT.containers.list()]
+
             elif RUNC_CMD == "docker":
-                lines = result.splitlines()
-                
-                for line in lines:
-                    containers.append(json.loads(line)['Names'])
+                containers = [c.id for c in DOCKER_CLIENT.containers.list()]   # TODO: pass all=True to list stopped containers as well
             else:
                 return
         
