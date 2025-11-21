@@ -1,4 +1,5 @@
 import argparse
+import sys
 import multiprocessing
 from concurrent.futures import ThreadPoolExecutor
 import subprocess
@@ -152,4 +153,4 @@ def main():
 
 
 if __name__ == "__main__":
-    main()
+    sys.exit(main())
